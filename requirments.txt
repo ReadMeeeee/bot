@@ -1,0 +1,9 @@
+aiogram==3.18.0
+python-dotenv==1.0.1
+
+transformers==4.49.0
+torch==2.6.0
+accelerate==1.4.0
+
+sqlalchemy==2.0.38
+aiosqlite==0.21.0
