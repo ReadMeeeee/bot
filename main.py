@@ -4,6 +4,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
 from config import API_TG
 from Chat.commands import *
+from Chat.commands_group import *
 from Chat.handler import handle_message
 from database.models import Base, engine
 
