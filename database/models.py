@@ -17,26 +17,29 @@ class Base(AsyncAttrs, DeclarativeBase):
 class Group(Base):
     __tablename__ = 'groups'
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String, nullable=False)  # Название группы (ПМИ, ФИИТ, и т.д.)
-    number: Mapped[int] = mapped_column(Integer, nullable=False)  # Номер группы (1, 2, 6 и т.д.)
-    tg_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)  # Телеграм ID группы
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)           # Суррогатный ID группы в БД
+    group_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)  # Телеграм ID группы
+
+    group_name: Mapped[str] = mapped_column(String, nullable=False)     # Название группы
+    group_course: Mapped[int] = mapped_column(Integer, nullable=False)  # Курс группы
+    group_number: Mapped[int] = mapped_column(Integer, nullable=False)  # Номер группы
+
     tg_link: Mapped[str] = mapped_column(String, nullable=True)  # Ссылка на группу в Telegram
-    bot_name: Mapped[str] = mapped_column(String, nullable=True) # Имя бота
 
     students = relationship("Student", back_populates="group")  # Связь с таблицей студентов
 
 
-# Таблица студентов
+# Таблица студентов (без избыточных данных о группе)
 class Student(Base):
     __tablename__ = 'students'
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    tg_id: Mapped[int] = mapped_column(BigInteger, nullable=False)  # Телеграм ID студента
-    username: Mapped[str] = mapped_column(String, unique=True, nullable=True)  # Телеграм username (@username)
-    full_name: Mapped[str] = mapped_column(String, nullable=False)  # ФИО студента
-    is_leader: Mapped[bool] = mapped_column(Boolean, default=False)  # Староста или нет
-    course: Mapped[str] = mapped_column(String, nullable=False)  # Курс (Бакалавриат 1, Магистратура 2 и т.д.)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)  # Суррогатный ID студента
+
+    student_tg_id: Mapped[int] = mapped_column(BigInteger, nullable=False)             # Телеграм ID студента
+    student_username: Mapped[str] = mapped_column(String, unique=True, nullable=True)  # @username студента
+    student_full_name: Mapped[str] = mapped_column(String, nullable=False)             # ФИ студента
+    student_is_leader: Mapped[bool] = mapped_column(Boolean, default=False)            # Является ли старостой
+
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), nullable=False)  # Внешний ключ на группу
 
     group = relationship("Group", back_populates="students")  # Связь с таблицей групп
