@@ -1,11 +1,15 @@
 import logging
 import asyncio
+
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
+
 from config import API_TG
+
 from Chat.commands import *
 from Chat.commands_group import *
 from Chat.handler import handle_message
+
 from database.models import Base, engine
 
 
@@ -23,6 +27,7 @@ dp.message.register(handle_message)
 async def init_db():
     """Инициализация базы данных, если она еще не создана."""
     async with engine.begin() as conn:
+        # await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
         print("База данных и таблицы созданы или уже существуют")
 
