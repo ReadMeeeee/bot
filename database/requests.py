@@ -1,8 +1,9 @@
 from sqlalchemy.future import select
 from database.models import Student, Group, async_session
 
-# Добавление новой группы
-async def add_group(tg_id: int, name: str, course: int, number: int, link: str):
+
+# Добавление новой группы с расписанием
+async def add_group(tg_id: int, name: str, course: int, number: int, link: str, schedule: dict):
     async with async_session() as session:
         async with session.begin():
             group = Group(
@@ -10,10 +11,23 @@ async def add_group(tg_id: int, name: str, course: int, number: int, link: str):
                 group_name=name,
                 group_course=course,
                 group_number=number,
-                tg_link=link
+                tg_link=link,
+                schedule=schedule  # Добавляем расписание при создании группы
             )
             session.add(group)
         await session.commit()
+
+# Функция обновления расписания группы
+async def update_schedule(tg_id: int, new_schedule_json: str):
+    async with async_session() as session:
+        async with session.begin():
+            result = await session.execute(select(Group).filter_by(group_id=tg_id))
+            group = result.scalar_one_or_none()
+            if group:
+                group.schedule_json = new_schedule_json
+                await session.commit()
+                return f"✅ Расписание обновлено для группы с tg_id {tg_id}"
+            return f"❌ Группа с tg_id {tg_id} не найдена."
 
 # Добавление студента
 async def add_student(tg_id: int, username: str, full_name: str, is_leader: bool, group_id: int):
@@ -82,3 +96,14 @@ async def get_students_by_group(group_id: int):
     async with async_session() as session:
         result = await session.execute(select(Student).filter_by(group_id=group_id))
         return result.scalars().all()
+
+# Получение расписания группы
+# Сделать функцию связанную с ней автоматической (раз в неделю например)
+# Или раз в неделю мб сигнал какой-то об изменении ловить с апи
+async def get_schedule_by_group(group_id: int):
+    async with async_session() as session:
+        result = await session.execute(select(Group).filter_by(group_id=group_id))
+        group = result.scalar_one_or_none()
+        if group:
+            return group.schedule
+        return None

@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, String, Boolean, ForeignKey, Integer
+from sqlalchemy import BigInteger, String, Boolean, ForeignKey, Integer, JSON
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
 
@@ -25,6 +25,8 @@ class Group(Base):
     group_number: Mapped[int] = mapped_column(Integer, nullable=False)  # Номер группы
 
     tg_link: Mapped[str] = mapped_column(String, nullable=True)  # Ссылка на группу в Telegram
+
+    schedule: Mapped[dict] = mapped_column(JSON, nullable=True) # Строка с расписанием группы
 
     students = relationship("Student", back_populates="group")  # Связь с таблицей студентов
 
