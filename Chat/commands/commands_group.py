@@ -1,5 +1,6 @@
 from Chat.config import types
-from Chat.schedule import *
+from AI.ai_funcs import get_schedule
+from config import link_schedule
 from database.requests import add_group, add_student, update_leader, delete_student, get_group_by_tg_id
 
 
@@ -23,6 +24,12 @@ async def create_group(message: types.Message):
         return
 
     name, course, number, link = params
+    if name.lower() not in("пми", "пми (биоинф)", "математика", "механика и математика",
+                   "tcs&it", "фиит", "педм", "педми"):
+        await message.reply("Неверное название группы.\n"
+                            "Должно быть из: ПМИ, ПМИ (БИОИНФ), Математика, Механика и математика, "
+                            "TCS&IT, ФИИТ, ПедМ, ПедМИ")
+        return
     try:
         course = int(course)
         number = int(number)
@@ -30,8 +37,7 @@ async def create_group(message: types.Message):
         await message.reply("Курс и номер группы должны быть числовыми значениями.")
         return
 
-    url = "https://schedule.sfedu.ru/APIv1/schedule/grade/"
-    schedule_result = get_schedule(url, course, name, number)
+    schedule_result = get_schedule(link_schedule, course, name, number)
 
     await add_group(tg_id=message.chat.id, name=name, course=course, number=number, link=link, schedule=schedule_result)
     await message.reply(f"Группа {name}-{number} добавлена!")

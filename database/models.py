@@ -12,7 +12,7 @@ async_session = async_sessionmaker(engine, expire_on_commit=False)
 class Base(AsyncAttrs, DeclarativeBase):
     pass
 
-
+# Добавить старосту
 # Таблица групп
 class Group(Base):
     __tablename__ = 'groups'
@@ -31,7 +31,7 @@ class Group(Base):
     students = relationship("Student", back_populates="group")  # Связь с таблицей студентов
 
 
-# Таблица студентов (без избыточных данных о группе)
+# Таблица студентов (без избыточных данных о группе!!!)
 class Student(Base):
     __tablename__ = 'students'
 

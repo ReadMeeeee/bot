@@ -1,6 +1,8 @@
 from requests import get
+from database.requests import get_schedule_by_group
 
 
+# обновлять расписание в первые дни семестров
 def get_schedule(link, course, group_name, group_number, day='all'):
     url = link + str(course)
     response = get(url)
@@ -74,3 +76,48 @@ def get_schedule(link, course, group_name, group_number, day='all'):
 # schedule_result = get_schedule(url, 4, 'ПМИ', 1, day='all')
 # for i in ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']:
 #     print(i, schedule_result[i])
+
+
+async def send_schedule(group_id, day=7):
+    schedule = await get_schedule_by_group(group_id)
+    days_dict = {
+        '1': schedule['Понедельник'],
+        '2': schedule['Вторник'],
+        '3': schedule['Среда'],
+        '4': schedule['Четверг'],
+        '5': schedule['Пятница'],
+        '6': schedule['Суббота'],
+    }
+    if day == 7:
+        return schedule
+    elif day in days_dict:
+        return {day: days_dict[day]}
+
+
+async def get_news_site():
+    return
+
+async def send_news_site():
+    return "news from site"
+
+async def send_news_vk():
+    return "news from vk"
+
+async def send_news():
+    news_site = await send_news()
+    news_vk = await send_news_vk()
+    return (f"Новости на веб-сайте мехмата: {news_site}\n "
+            f"Новости на странице ВК мехмата {news_vk}")
+
+# нужна функция обработки ответа ИИ по запросу студента
+async def get_task(task):
+    tasks = {
+        'расписание': send_schedule,
+        'новости': send_news()
+    }
+    return {tasks: tasks[task]}
+
+url = "https://schedule.sfedu.ru/APIv1/schedule/grade/"
+schedule_result = get_schedule(url, 4, 'ПМИ', 1, day='all')
+for i in ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']:
+    print(i, schedule_result[i])

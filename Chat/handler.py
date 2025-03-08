@@ -1,6 +1,7 @@
 from Chat.config import types
-from AI.AI_funcs import get_ai_response
+from AI.ai_model import *
 
+AI_model = AIModel("Qwen/Qwen2-1.5B-Instruct")
 
 # Обработчик всех сообщений
 async def handle_message(message: types.Message):
@@ -11,7 +12,7 @@ async def handle_message(message: types.Message):
 
     # === Приватный чат: бот отвечает всегда ===
     if message.chat.type == "private":
-        ai_response = get_ai_response(user_input)
+        ai_response = AI_model.get_response(user_input)
         await message.reply(ai_response)
         return
 
@@ -20,6 +21,6 @@ async def handle_message(message: types.Message):
         if message.text.startswith("/assistant"):
             text = user_input.split(" ", 1)[1]
             if text:
-                ai_response = get_ai_response(text)
+                ai_response = AI_model.get_response(text)
                 await message.reply(ai_response)
                 return
