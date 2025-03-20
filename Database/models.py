@@ -26,7 +26,10 @@ class Group(Base):
 
     tg_link: Mapped[str] = mapped_column(String, nullable=True)  # Ссылка на группу в Telegram
 
+    # news: Mapped[dict] = mapped_column(JSON, nullable=True)     # Строка с последними новостями (актуальными (а как?))
+    # events: Mapped[dict] = mapped_column(JSON, nullable=True)   # Строка с событиями (староста кидает)
     schedule: Mapped[dict] = mapped_column(JSON, nullable=True) # Строка с расписанием группы
+    # homework: Mapped[dict] = mapped_column(JSON, nullable=True)  # Строка с ДЗ группы
 
     students = relationship("Student", back_populates="group")  # Связь с таблицей студентов
 

@@ -1,7 +1,7 @@
 from Chat.config import types
-from AI.ai_funcs import get_schedule
+from Web.url_data import URLData
 from config import link_schedule
-from database.requests import add_group, add_student, update_leader, delete_student, get_group_by_tg_id
+from Database.requests import add_group, add_student, update_leader, delete_student, get_group_by_tg_id
 
 
 def is_group_chat(message: types.Message) -> bool:
@@ -37,7 +37,8 @@ async def create_group(message: types.Message):
         await message.reply("Курс и номер группы должны быть числовыми значениями.")
         return
 
-    schedule_result = get_schedule(link_schedule, course, name, number)
+    url = URLData(link_schedule)
+    schedule_result = url._get_schedule(course, name, number)
 
     await add_group(tg_id=message.chat.id, name=name, course=course, number=number, link=link, schedule=schedule_result)
     await message.reply(f"Группа {name}-{number} добавлена!")

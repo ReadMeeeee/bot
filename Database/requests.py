@@ -1,5 +1,5 @@
 from sqlalchemy.future import select
-from database.models import Student, Group, async_session
+from Database.models import Student, Group, async_session
 
 
 # Добавление новой группы с расписанием
@@ -98,12 +98,28 @@ async def get_students_by_group(group_id: int):
         return result.scalars().all()
 
 # Получение расписания группы
-# Сделать функцию связанную с ней автоматической (раз в неделю например)
-# Или раз в неделю мб сигнал какой-то об изменении ловить с апи
 async def get_schedule_by_group(group_id: int):
     async with async_session() as session:
         result = await session.execute(select(Group).filter_by(group_id=group_id))
         group = result.scalar_one_or_none()
         if group:
             return group.schedule
+        return None
+
+# Получение событий группы
+async def get_events_by_group(group_id: int):
+    async with async_session() as session:
+        result = await session.execute(select(Group).filter_by(group_id=group_id))
+        group = result.scalar_one_or_none()
+        if group:
+            return group.events
+        return None
+
+# Получение домашнего задания группы
+async def get_homework_by_group(group_id: int):
+    async with async_session() as session:
+        result = await session.execute(select(Group).filter_by(group_id=group_id))
+        group = result.scalar_one_or_none()
+        if group:
+            return group.homework
         return None

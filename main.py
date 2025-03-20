@@ -6,16 +6,17 @@ from aiogram.filters import Command
 
 from config import API_TG
 
-from Chat.commands.commands import *
-from Chat.commands.commands_group import *
+from Chat.Commands.commands import *
+from Chat.Commands.commands_group import *
 from Chat.handler import handle_message
 
-from database.models import Base, engine
+from Database.models import Base, engine
 
 
 # Инициализация бота и диспетчера
 bot = Bot(token=API_TG)
 dp = Dispatcher()
+
 
 dp.message.register(send_welcome, Command("start"))
 dp.message.register(send_help, Command("help"))

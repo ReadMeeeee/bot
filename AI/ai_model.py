@@ -1,7 +1,7 @@
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
-model = "Qwen/Qwen2-1.5B-Instruct"
+
 BNB_8BIT_CONFIG = BitsAndBytesConfig(load_in_8bit=True)
 BNB_4BIT_CONFIG = BitsAndBytesConfig(
     load_in_4bit=True,
@@ -58,8 +58,9 @@ class AIModel:
 
 
     def get_response(self, message: str, _chat: list[dict[str, str]] = None, role: str = None, instruction: str = None,
-                     max_tokens=50, temperature=1.0,
-                     repetition_penalty=1.0, no_repeat_ngram_size=0):
+                     max_tokens: int = 50, temperature: float = 1.0,
+                     repetition_penalty: float = 1.0, no_repeat_ngram_size: int = 0,
+                     sampling: bool = True):
         """
         Функция для генерации ответа на запрос к ИИ
 
@@ -67,10 +68,11 @@ class AIModel:
         :param _chat: Параметр - словарь, уже содержащий роль и инструкции (для внутриклассового пользования)
         :param role: Роль для ИИ
         :param instruction: Инструкция для обработки текста при помощи ИИ
-        :param max_tokens: Максимальное количество токенов в ответе
-        :param temperature: Параметр, контроля случайности генерации. Выше - случайнее
-        :param repetition_penalty: Коэффициент штрафа за повторение токенов
-        :param no_repeat_ngram_size: Размер n-граммы, запрещающей повторы слов
+        :param max_tokens: Максимальное количество токенов в ответе (по умолчанию 50)
+        :param temperature: Параметр, контроля случайности генерации. Выше - случайнее (по умолчанию 1.0)
+        :param repetition_penalty: Коэффициент штрафа за повторение токенов (по умолчанию 1.0)
+        :param no_repeat_ngram_size: Размер n-граммы, запрещающей повторы слов (по умолчанию 0)
+        :param sampling: Включение и выключение сэмплинга (жадность при отборе данных) (по умолчанию True)
 
         :return: Строка со сгенерированным ответом
         """
@@ -90,7 +92,7 @@ class AIModel:
             temperature=temperature,
             repetition_penalty=repetition_penalty,
             no_repeat_ngram_size=no_repeat_ngram_size,
-            do_sample=True
+            do_sample=sampling
         )
 
         generated_ids = [
@@ -99,23 +101,12 @@ class AIModel:
 
         return self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-
     def load(self, path: str):
         """
-        Загружает модель и токенизатор из указанного пути.
+        Загружает модель и токенизатор из указанного пути
 
         :param path: путь для загрузки
         """
         self.tokenizer = AutoTokenizer.from_pretrained(path)
         self.model = AutoModelForCausalLM.from_pretrained(path, device_map=self.device)
         print(f"Модель и токенизатор загружены из {path}")
-
-# TODO
-# через классы -> в ООП
-# туда же и get-send
-# чтобы не было комментирование и раскомментирования
-
-# function calling
-
-# Обучить модель на форматированный вывод: {задача{параметры}, информация для ИИ из сторонних источников, ответ ИИ}
-#                                                              информацию доставать функцией и класть RAGом
