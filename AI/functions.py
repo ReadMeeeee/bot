@@ -2,6 +2,7 @@ from AI.ai_model import *
 from Web.url_data import *
 from config import link_news_sfedu, link_news_mmcs
 from Database.requests import get_schedule_by_group, get_events_by_group, get_homework_by_group
+import datetime
 
 
 def filter_relevant_news(model: AIModel, news_list: list[dict]) -> list[dict]:
@@ -78,21 +79,24 @@ async def handle_define(model: AIModel, message: str, group_id) -> str:
 
     role = (
         "You are an AI assistant for a university Telegram group chat. "
-        "You are an expert in text classification of academic content in Russian. "
-        "Your goal is to accurately classify the incoming message into one of the defined categories."
+        "You are an expert in text classification of academic content in Russian and in extracting schedule details. "
+        "Your goal is to accurately classify the incoming message into one of the defined categories and, if applicable, determine the specific day(s) of the week."
     )
 
     instructions = (
         "Analyze the given message in Russian and determine its topic. "
         "Classify the message into one of the following categories: "
-        "'Расписание' if the message is about schedules or timetables; "
-        "'Новости' if it contains university or academic news; "
-        "'События' if it refers to events such as lectures, seminars, or social gatherings; "
-        "'Домашнее задание' if it includes homework or academic assignments; "
-        "and 'Другое' if it does not clearly belong to any of the above categories. "
-        "Return only one of these category names as the final answer."
+        "'расписание' if the message is about schedules or timetables; "
+        "'новости' if it contains university or academic news; "
+        "'события' if it refers to events such as lectures, seminars, or social gatherings; "
+        "'домашнее задание' if it includes homework or academic assignments; "
+        "and 'другое' if it does not clearly belong to any of the above categories. "
+        "If the message is classified as 'расписание', further analyze it for day-of-week references. "
+        "Detect words like 'сегодня', 'завтра', 'послезавтра', explicit day names like 'понедельник', 'вторник', etc., or a date in the format 'dd.mm' or 'dd.mm.yyyy'. "
+        "Return the final answer as a single string. For schedule queries, the returned string must be in the following format: "
+        "'расписание <day> <day> ...', where <day> represents the day of the week in Russian (in lowercase). "
+        "If no specific day is mentioned beyond 'расписание', return the schedule for the entire week."
     )
-
 
     category = model.get_response(
         message=message,
@@ -104,10 +108,78 @@ async def handle_define(model: AIModel, message: str, group_id) -> str:
     )
 
     category = category.strip().lower()
+    category = category.split()
 
     # TODO положить определения дня недели из сообщения на модель ИИ
-    if 'расписание' in category:
-        return f"Пожалуйста, ознакомьтесь с актуальным расписанием занятий:\n{await get_schedule_by_group(group_id)}"
+    if "расписание" in category:
+        schedule = await get_schedule_by_group(group_id)
+        schedule = {key.lower(): value for key, value in schedule.items()}
+        answer = ""
+        answer_if_sunday = ("В воскресенье пар не бывает.\n"
+                            "Если вам поставили пары на воскресенье - скорее всего они в ближайших событиях")
+
+        if len(category) < 2:
+            answer = schedule
+
+        elif category[1] == "воскресенье":
+            answer += answer_if_sunday
+
+        else:
+            for i in category[1:]:
+
+                if i in [
+                    'понедельник', 'вторник', 'среда',
+                    'четверг', 'пятница', 'суббота'
+                ]:
+                    answer += f"Расписание на {i}:\n{schedule[i]}\n"
+
+                else:
+                    days_dict = {
+                        0: "понедельник",
+                        1: "вторник",
+                        2: "среда",
+                        3: "четверг",
+                        4: "пятница",
+                        5: "суббота",
+                        6: "воскресенье",
+                        7: "понедельник",
+                        8: "вторник"
+                    }
+                    today = datetime.datetime.now().weekday()
+
+                    if i in ["завтра", "послезавтра"]:
+                        day = today + 1
+                        if i == "послезавтра":
+                            day += 1
+
+                        day_of_week = days_dict[day]
+                        if day_of_week == "воскресенье":
+                            answer += answer_if_sunday
+                        else:
+                            answer += f"Расписание на {i}:\n{schedule[day_of_week]}\n"
+
+                    else:
+                        parsed_date = None
+                        try:
+                            parsed_date = datetime.datetime.strptime(i, "%d.%m.%Y")
+                        except ValueError:
+                            try:
+                                parsed_date = datetime.datetime.strptime(i, "%d.%m")
+                                parsed_date = parsed_date.replace(year=datetime.datetime.now().year)
+                            except ValueError:
+                                parsed_date = None
+                        if parsed_date is not None:
+                            day_index = parsed_date.weekday()
+                            day_of_week = days_dict.get(day_index, "неизвестный день")
+                            if day_of_week == "воскресенье":
+                                answer += answer_if_sunday
+                            else:
+                                answer += f"расписание на {i} ({day_of_week}):\n{schedule[day_of_week]}\n"
+                        else:
+                            answer += f"неверный формат даты: {i}\n"
+
+
+        return f"Пожалуйста, ознакомьтесь с актуальным расписанием занятий:\n{answer}"
 
     if 'новости' in category:
         sfedu = URLData(link_news_sfedu)
