@@ -8,11 +8,9 @@ engine = create_async_engine(url='sqlite+aiosqlite:///db.sqlite3', echo=True)
 async_session = async_sessionmaker(engine, expire_on_commit=False)
 
 
-# Базовый класс
 class Base(AsyncAttrs, DeclarativeBase):
     pass
 
-# Добавить старосту
 # Таблица групп
 class Group(Base):
     __tablename__ = 'groups'
@@ -26,10 +24,10 @@ class Group(Base):
 
     tg_link: Mapped[str] = mapped_column(String, nullable=True)  # Ссылка на группу в Telegram
 
-    # news: Mapped[dict] = mapped_column(JSON, nullable=True)     # Строка с последними новостями (актуальными (а как?))
-    # events: Mapped[dict] = mapped_column(JSON, nullable=True)   # Строка с событиями (староста кидает)
-    schedule: Mapped[dict] = mapped_column(JSON, nullable=True) # Строка с расписанием группы
-    # homework: Mapped[dict] = mapped_column(JSON, nullable=True)  # Строка с ДЗ группы
+    # news: Mapped[dict] = mapped_column(JSON, nullable=True)      # Строка с последними новостями (актуальными (а как?))
+    events: Mapped[str] = mapped_column(String, nullable=True)     # Строка с событиями (староста кидает)
+    schedule: Mapped[dict] = mapped_column(JSON, nullable=True)    # Строка с расписанием группы
+    homework: Mapped[str] = mapped_column(String, nullable=True)   # Строка с ДЗ группы
 
     students = relationship("Student", back_populates="group")  # Связь с таблицей студентов
 

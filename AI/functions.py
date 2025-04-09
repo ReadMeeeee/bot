@@ -1,11 +1,31 @@
-from AI.ai_model import *
-from Web.url_data import *
+from AI.models.class_ai_local import *
+from AI.models.class_ai_api import *
+
+from AI.embedding_manager import embeddings, load_embedded_data, find_similarity
+
+from Parsing.url_data import *
 from config import link_news_sfedu, link_news_mmcs
-from Database.requests import get_schedule_by_group, get_events_by_group, get_homework_by_group
+
 import datetime
 
+from AI.models.instructions import role_news, instructions_news,\
+                                   role_classification, instructions_classification,\
+                                   instructions_fallback, role_fallback
+from Database.requests import get_events_by_group, get_homework_by_group, get_schedule_by_group
 
-def filter_relevant_news(model: AIModel, news_list: list[dict]) -> list[dict]:
+
+async def just_response(model, instructions, role, message, tokens):
+    response = model.get_response(
+        message=message,
+        instruction=instructions,
+        role=role,
+        max_tokens=tokens,
+        temperature=0.1,
+        # sampling=True # Для локальных моделей
+    )
+    return response
+
+async def filter_relevant_news(model: AIModelLocal | AIModelAPI, news_list: list[dict]) -> list[dict]:
     """
     Фильтрует и возвращает новости, актуальные для студентов
 
@@ -16,186 +36,131 @@ def filter_relevant_news(model: AIModel, news_list: list[dict]) -> list[dict]:
 
     relevant_news = []
 
-    role = (
-        "You are an AI assistant for university group, text classification expert specialized in academic content. "
-        "Your task is to analyze a headline in Russian and determine whether it belongs to an academic category or not. "
-        "The academic categories are defined as follows: "
-        "1. 'обучение' – headlines related to courses, lectures, seminars, or general academic instruction at the university; "
-        "2. 'учебный план' – headlines related to curriculum design, course schedules, syllabi, or changes in the academic program; "
-        "3. 'стажировки' – headlines related to internships, internship recruitment, or company demonstrations for internships; "
-        "4. 'олимпиады' – headlines related to academic competitions, olympiads, or contests organized for university students. "
-        "If the headline clearly belongs to at least one of these categories, you should return True; "
-        "if it does not, return False. "
-        "Note: Headlines that mention generic university events (such as celebrations, anniversaries, tutor announcements) "
-        "should be classified as False, unless the main focus is on educational activities."
-    )
-
-    instructions = (
-        "Instruction: Analyze the following headline in Russian and determine whether it primarily refers to academic topics "
-        "(i.e. 'обучение', 'учебный план', 'стажировки', or 'олимпиады') and is directly connected to educational activities. "
-        "Return True if the headline is primarily about educational topics; otherwise, return False. "
-        "Do not include any additional text in your answer, only the Boolean value 'True' or 'False'. "
-        "Important: Even if the headline contains words like 'отпраздновала', 'юбилей', 'праздник', or 'подготовил тьюторов', "
-        "return True if the main focus is on educational topics; otherwise, return False. "
-        "Examples: "
-        "1. Headline: 'Новый курс по программированию запущен в ЮФУ' → True "
-        "2. Headline: 'Обновление учебного плана факультета математики' → True "
-        "3. Headline: 'Программа стажировок от ведущих компаний для студентов' → True "
-        "4. Headline: 'Олимпиада по физике для студентов университета стартует в этом году' → True "
-        "5. Headline: 'Кафедра «Теории и технологий в менеджменте» отпраздновала своё 25-летие' → False "
-        "6. Headline: 'ЮФУ подготовил тьюторов для Образовательного Фонда' → False "
-        "7. Headline: 'Конкурс «Мисс Мехмат»: яркое событие студенческой жизни!' → False "
-        "\nHeadline to process: "
-    )
-
     for news in news_list:
         message = (
             news.get('title', '')
         )
 
-        response = model.get_response(
-            message=message,
-            instruction=instructions,
-            role=role,
-            max_tokens=10,
-            temperature=0.1,
-            sampling=True
-        )
+        response = await just_response(model, instructions_news, role_news, message,10)
 
         if "true" in response.lower():
             relevant_news.append(news)
 
     return relevant_news
 
-async def handle_define(model: AIModel, message: str, group_id) -> str:
-    """
-    Обрабатывает сообщение, определяет категорию и выбирает, какой ответ отправить студенту.
+async def get_schedule(category, group_id):
+    schedule = await get_schedule_by_group(group_id)
+    schedule = {key.lower(): value for key, value in schedule.items()}
 
-    :param model: Модель ИИ, для обработки новостей
-    :param message: Сообщение от пользователя
-    :param group_id: ID группы (для определения релевантности информации для группы)
-    :return: Строка с сообщением для студента
-    """
-
-    role = (
-        "You are an AI assistant for a university Telegram group chat. "
-        "You are an expert in text classification of academic content in Russian and in extracting schedule details. "
-        "Your goal is to accurately classify the incoming message into one of the defined categories and, if applicable, determine the specific day(s) of the week."
+    formatted_schedule = "\n\n".join(
+        schedule.get(day, f"{day.capitalize()}:\n  Нет занятий")
+        for day in ['понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота']
     )
 
-    instructions = (
-        "Analyze the given message in Russian and determine its topic. "
-        "Classify the message into one of the following categories: "
-        "'расписание' if the message is about schedules or timetables; "
-        "'новости' if it contains university or academic news; "
-        "'события' if it refers to events such as lectures, seminars, or social gatherings; "
-        "'домашнее задание' if it includes homework or academic assignments; "
-        "and 'другое' if it does not clearly belong to any of the above categories. "
-        "If the message is classified as 'расписание', further analyze it for day-of-week references. "
-        "Detect words like 'сегодня', 'завтра', 'послезавтра', explicit day names like 'понедельник', 'вторник', etc., or a date in the format 'dd.mm' or 'dd.mm.yyyy'. "
-        "Return the final answer as a single string. For schedule queries, the returned string must be in the following format: "
-        "'расписание <day> <day> ...', where <day> represents the day of the week in Russian (in lowercase). "
-        "If no specific day is mentioned beyond 'расписание', return the schedule for the entire week."
-    )
+    answer = ""
+    answer_if_sunday = ("В воскресенье пар не бывает.\n"
+                        "Если вам поставили пары на воскресенье - скорее всего они в ближайших событиях")
 
-    category = model.get_response(
-        message=message,
-        instruction=instructions,
-        role=role,
-        max_tokens=10,
-        temperature=0.1,
-        sampling=True
-    )
+    if len(category) < 2:
+        answer = formatted_schedule
 
-    category = category.strip().lower()
-    category = category.split()
+    elif category[1] == "воскресенье":
+        answer += answer_if_sunday
 
-    # TODO положить определения дня недели из сообщения на модель ИИ
-    if "расписание" in category:
-        schedule = await get_schedule_by_group(group_id)
-        schedule = {key.lower(): value for key, value in schedule.items()}
-        answer = ""
-        answer_if_sunday = ("В воскресенье пар не бывает.\n"
-                            "Если вам поставили пары на воскресенье - скорее всего они в ближайших событиях")
+    else:
+        for i in category[1:]:
 
-        if len(category) < 2:
-            answer = schedule
+            if i in [
+                'понедельник', 'вторник', 'среда',
+                'четверг', 'пятница', 'суббота'
+            ]:
+                answer += f"{schedule[i]}\n"
 
-        elif category[1] == "воскресенье":
-            answer += answer_if_sunday
+            else:
+                days_dict = {
+                    0: "понедельник",
+                    1: "вторник",
+                    2: "среда",
+                    3: "четверг",
+                    4: "пятница",
+                    5: "суббота",
+                    6: "воскресенье",
+                    7: "понедельник",
+                    8: "вторник"
+                }
+                today = datetime.datetime.now().weekday()
 
-        else:
-            for i in category[1:]:
+                if i in ["завтра", "послезавтра"]:
+                    day = today + 1
+                    if i == "послезавтра":
+                        day += 1
 
-                if i in [
-                    'понедельник', 'вторник', 'среда',
-                    'четверг', 'пятница', 'суббота'
-                ]:
-                    answer += f"Расписание на {i}:\n{schedule[i]}\n"
+                    day_of_week = days_dict[day]
+                    if day_of_week == "воскресенье":
+                        answer += answer_if_sunday
+                    else:
+                        answer += f"{schedule[day_of_week]}\n"
 
                 else:
-                    days_dict = {
-                        0: "понедельник",
-                        1: "вторник",
-                        2: "среда",
-                        3: "четверг",
-                        4: "пятница",
-                        5: "суббота",
-                        6: "воскресенье",
-                        7: "понедельник",
-                        8: "вторник"
-                    }
-                    today = datetime.datetime.now().weekday()
-
-                    if i in ["завтра", "послезавтра"]:
-                        day = today + 1
-                        if i == "послезавтра":
-                            day += 1
-
-                        day_of_week = days_dict[day]
+                    parsed_date = None
+                    try:
+                        parsed_date = datetime.datetime.strptime(i, "%d.%m.%Y")
+                    except ValueError:
+                        try:
+                            parsed_date = datetime.datetime.strptime(i, "%d.%m")
+                            parsed_date = parsed_date.replace(year=datetime.datetime.now().year)
+                        except ValueError:
+                            parsed_date = None
+                    if parsed_date is not None:
+                        day_index = parsed_date.weekday()
+                        day_of_week = days_dict.get(day_index, "неизвестный день")
                         if day_of_week == "воскресенье":
                             answer += answer_if_sunday
                         else:
-                            answer += f"Расписание на {i}:\n{schedule[day_of_week]}\n"
-
+                            answer += f"{i}:\n{schedule[day_of_week]}\n"
                     else:
-                        parsed_date = None
-                        try:
-                            parsed_date = datetime.datetime.strptime(i, "%d.%m.%Y")
-                        except ValueError:
-                            try:
-                                parsed_date = datetime.datetime.strptime(i, "%d.%m")
-                                parsed_date = parsed_date.replace(year=datetime.datetime.now().year)
-                            except ValueError:
-                                parsed_date = None
-                        if parsed_date is not None:
-                            day_index = parsed_date.weekday()
-                            day_of_week = days_dict.get(day_index, "неизвестный день")
-                            if day_of_week == "воскресенье":
-                                answer += answer_if_sunday
-                            else:
-                                answer += f"расписание на {i} ({day_of_week}):\n{schedule[day_of_week]}\n"
-                        else:
-                            answer += f"неверный формат даты: {i}\n"
+                        answer += f"неверный формат даты: {i}\n"
+
+    return f"Пожалуйста, ознакомьтесь с актуальным расписанием занятий:\n{answer}"
+
+async def get_homework(group_id):
+    return (f"Проверьте, пожалуйста, информацию по домашним заданиям:"
+            f"\n{await get_homework_by_group(group_id)}")
+
+async def get_events(group_id):
+    return (f"Не пропустите предстоящие события и мероприятия:"
+            f"\n{await get_events_by_group(group_id)}")
+
+async def get_news(model, group_id):
+    sfedu = URLData(link_news_sfedu)
+    mmcs = URLData(link_news_mmcs)
+    data = sfedu._get_news_sfedu() + mmcs._get_news_mmcs()
+    relevant_news = await filter_relevant_news(model, data)
+    news = ""
+    for i in relevant_news:
+        news += i['title'] + '\n'
+    return news
 
 
-        return f"Пожалуйста, ознакомьтесь с актуальным расписанием занятий:\n{answer}"
+async def handle_define(model: AIModelLocal | AIModelAPI, message: str, group_id, path_f: str) -> str:
+    category_response = await just_response(model, instructions_classification, role_classification, message, 25)
+    category = category_response.strip().lower().split()
 
-    if 'новости' in category:
-        sfedu = URLData(link_news_sfedu)
-        mmcs = URLData(link_news_mmcs)
-        data = sfedu._get_news_sfedu() + mmcs._get_news_mmcs()
-        relevant_news = filter_relevant_news(model, data)
-        news = ""
-        for i in relevant_news:
-            news += i['title'] + '\n'
-        return news
+    category_map = {
+        "расписание": lambda: get_schedule(category, group_id),
+        "новости": lambda: get_news(model, group_id),
+        "события": lambda: get_events(group_id),
+        "домашнее задание": lambda: get_homework(group_id),
+    }
 
-    if 'события' in category:
-        return f"Не пропустите предстоящие события и мероприятия:\n{await get_events_by_group(group_id)}"
+    for key, func in category_map.items():
+        if key in category:
+            return await func()
 
-    if 'домашнее задание' in category:
-        return f"Проверьте, пожалуйста, информацию по домашним заданиям:\n{await get_homework_by_group(group_id)}"
+    # Если ни одна категория не подошла, используем fallback
+    db = await load_embedded_data(path_f, embeddings)
+    relevant_data = await find_similarity(db, message)
+    instructions_fb = await instructions_fallback(relevant_data)
 
-    else:
-        return model.get_response(message)
+    return await just_response(model, instructions_fb, role_fallback, message, 200)
+

@@ -1,5 +1,5 @@
 from Chat.config import types
-from Web.url_data import URLData
+from Parsing.url_data import URLData
 from config import link_schedule
 from Database.requests import add_group, add_student, update_leader, delete_student, get_group_by_tg_id
 

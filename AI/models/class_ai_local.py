@@ -11,7 +11,7 @@ BNB_4BIT_CONFIG = BitsAndBytesConfig(
 )
 
 
-class AIModel:
+class AIModelLocal:
     def __init__(self, model_name: str, tokenizer = None, quantization_config = None,
                  dtype: torch.dtype = torch.bfloat16, trust_remote_code: bool = False, device = None):
         """

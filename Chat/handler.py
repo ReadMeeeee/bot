@@ -1,9 +1,11 @@
 from Chat.config import types
-from AI.ai_model import *
-from AI.functions import *
+from config import API_AI
+from AI.functions import AIModelAPI, handle_define
 
 
-model = AIModel("Qwen/Qwen2-1.5B-Instruct")
+base_url = "https://api.deepseek.com"
+model_name = "deepseek-chat"
+model = AIModelAPI(API_AI, base_url, model_name)
 
 # Обработчик всех сообщений
 async def handle_message(message: types.Message):
@@ -24,7 +26,7 @@ async def handle_message(message: types.Message):
             text = user_input.split(" ", 1)[1]
             if text:
 
-                ai_response = await handle_define(model, text, message.chat.id)
+                ai_response = await handle_define(model, text, message.chat.id, "AI/embeddings_data/")
 
                 await message.reply(ai_response)
                 return

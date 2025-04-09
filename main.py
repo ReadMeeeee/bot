@@ -28,7 +28,7 @@ dp.message.register(handle_message)
 async def init_db():
     """Инициализация базы данных, если она еще не создана."""
     async with engine.begin() as conn:
-        # await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
         print("База данных и таблицы созданы или уже существуют")
 
